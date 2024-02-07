@@ -1,0 +1,141 @@
+---
+title: "PSET 02 - NBA Games"
+author: "S&DS 361"
+date: "Due 2024-02-06"
+output: pdf_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(pubtheme)
+```
+
+# Visualizing the NBA schedule
+
+Let's visualize how often teams play each other in a season, to better understand the structure of the NBA schedule. 
+
+```{r}
+d = readRDS('data/games.rds')
+d = d %>% 
+  filter(lg=='nba', season %in% 2022, season.type=='reg') %>%
+  select(date, away, home, ascore, hscore, season, gid)
+head(d)
+
+dg = d %>% 
+  group_by(away, home) %>%
+  summarise(games = n()) %>%
+  ungroup() %>%
+  complete(away, home, fill=list(games=0)) ## new function! 
+head(dg)
+```
+\newpage
+# Visualizing the schedule with a grid plot 
+
+```{r, fig.width=10, fig.height=10}
+
+title = "Number of Games Played by NBA Teams in 2022"
+
+gg = ggplot(dg, aes(x = home, 
+               y = away, 
+               fill = as.character(games))) + 
+  geom_tile(show.legend = TRUE) +
+  scale_fill_manual(values = c(pubbackgray, publightblue, pubblue))+
+  geom_tile(color = pubbackgray) + 
+  labs(title    = title,
+       subtitle = "Regular Season",
+       fill = 'Value')
+
+gg %>% pub(type = 'grid') +
+  scale_x_discrete(
+    expand = expansion(mult = c(0,0)), guide = guide_axis(angle = 45),
+    position = "bottom"
+  )
+
+```
+
+
+\newpage
+# Ordering the teams by division
+
+```{r}
+tms = read.csv('data/nba.teams.csv')
+
+tms = tms %>% 
+  arrange(conf, div) %>%
+  mutate(conf = paste0(toupper(substr(conf, 1, 1)), 
+                               substr(conf, 2, nchar(conf))),
+         
+         div  = paste0(toupper(substr(div , 1, 1)), 
+                               substr(div , 2, nchar( div))), 
+
+         div  = factor(div, 
+                       levels = unique(div))) 
+head(tms)
+
+
+
+```
+
+
+```{r, fig.width=10, fig.height=10}
+dg2 = dg %>% 
+  left_join(select(tms, team, div), by=c('home' = 'team')) %>%
+  rename(home_div = div) %>%
+  left_join(select(tms, team, div), by=c('away' = 'team')) %>%
+  rename(away_div = div) 
+
+teams.order = tms %>%
+  select(team) %>%
+  unlist()
+head(teams.order)
+
+dg2 = dg2 %>% 
+  mutate(home = factor(home, levels = teams.order),
+         away = factor(away, levels = teams.order))
+
+gg2 = ggplot(dg2, aes(x = home, 
+               y = away, 
+               fill = as.character(games))) + 
+  geom_tile(show.legend = TRUE) +
+  scale_fill_manual(values = c(pubbackgray, publightblue, pubblue))+
+  geom_tile(color = pubbackgray) + 
+  labs(title    = title,
+       subtitle = "Regular Season",
+       fill = 'Value')
+
+gg2 %>% pub(type = 'grid') +
+  scale_x_discrete(
+    expand = expansion(mult = c(0,0)), guide = guide_axis(angle = 45),
+    position = "bottom"
+  )
+
+
+
+```
+
+\newpage
+# Creating separation between the divisions
+
+
+```{r, fig.width=11, fig.height=10}
+g3 = ggplot(dg2, 
+            aes(x = away, 
+               y = home, 
+               fill = as.character(games))) + 
+  geom_tile(show.legend = TRUE, color = pubdarkgray) +
+  facet_grid(home_div ~ away_div, scales = 'free', space = 'free') +
+  scale_fill_manual(values = c(pubbackgray, publightblue, pubblue))+
+  labs(title    = title,
+       subtitle = "Regular Season",
+       fill = 'Value')
+
+g3 %>% pub(type = 'grid') +
+  scale_x_discrete(
+    expand = expansion(mult = c(0,0)), guide = guide_axis(angle = 45),
+    position = "bottom"
+  )
+
+
+        
+```
